@@ -9,6 +9,9 @@ class Login extends Controller
 {
     public function index()
     {
+          if (auth()->check()) {
+            return redirect()->route('dashboard');
+        }
         return view('content.authentications.auth-login-basic');
     }
 

@@ -47,15 +47,21 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FilesController;
 use App\Http\Controllers\Login;
 use App\Http\Controllers\UsersController;
+use App\Http\Controllers\UserAdminController;
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
+
     Route::get('/files', [FilesController::class, 'index'])->name('files.index');
-    Route::get('/files/upload', [FilesController::class, 'create'])
-        ->middleware('role:super_admin,admin_arsip')->name('files.create');
-    Route::post('/files', [FilesController::class, 'store'])
-        ->middleware('role:super_admin,admin_arsip')->name('files.store');
+    Route::get('/files/{id}/preview', [FilesController::class, 'preview'])->name('files.preview');
+    Route::get('/files/{id}/download', [FilesController::class, 'download'])->name('files.download');
+
+
+    // Route::get('/files/upload', [FilesController::class, 'create'])
+    //     ->middleware('role:super_admin,admin_arsip')->name('files.create');
+    // Route::post('/files', [FilesController::class, 'store'])
+    //     ->middleware('role:super_admin,admin_arsip')->name('files.store');
 
     Route::get('/users/create', [UsersController::class, 'create'])
         ->middleware('role:super_admin')->name('users.create');
@@ -63,9 +69,29 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('role:super_admin')->name('users.store');
 });
 
+
+Route::get('/admin/users', [UserAdminController::class, 'index'])->name('admin.users.index');
+Route::get('/admin/users/create', [UserAdminController::class, 'create'])->name('admin.users.create');
+Route::post('/admin/users', [UserAdminController::class, 'store'])->name('admin.users.store');
+
+Route::get('/admin/users/{id}/edit', [UserAdminController::class, 'edit'])->name('admin.users.edit');
+Route::put('/admin/users/{id}', [UserAdminController::class, 'update'])->name('admin.users.update');
+
+Route::delete('/admin/users/{id}', [UserAdminController::class, 'destroy'])->name('admin.users.destroy');
+
+
+Route::get('/files/upload', [FilesController::class, 'create'])->name('files.create');
+Route::post('/files', [FilesController::class, 'store'])->name('files.store');
+Route::get('/files/{id}/edit', [FilesController::class, 'edit'])->name('files.edit');
+Route::put('/files/{id}', [FilesController::class, 'update'])->name('files.update');
+Route::delete('/files/{id}', [FilesController::class, 'destroy'])->name('files.destroy');
+
+
 Route::get('/', [Login::class, 'index'])->name('index');
 Route::post('/login', [Login::class, 'login'])->name('login');
 Route::post('/logout', [Login::class, 'logout'])->name('logout');
+
+// Route::get('/users/list', [UsersController::class, 'index'])->name('admin.users.index');
 
 // // Main Page Route
 // Route::get('/dashboard-analytics', [Analytics::class, 'index'])->name('dashboard-analytics');
