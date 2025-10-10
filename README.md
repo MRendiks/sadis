@@ -12,23 +12,6 @@
    </a>
 </h1>
 
-<p align="center">Most Powerful & Comprehensive Free Bootstrap 5 HTML Laravel Admin Dashboard Template built for developers!</p>
-
-<p align="center">
-  <a href="https://github.com/themeselection/sadis-bootstrap-html-laravel-admin-template-free/blob/main/LICENSE">
-    <img src="https://img.shields.io/github/license/themeselection/sadis-html-laravel-admin-template-free" alt="license">
-  </a>
-  <a href="https://github.com/themeselection/sadis-bootstrap-html-laravel-admin-template-free/releases/">
-    <img src="https://img.shields.io/github/release/themeselection/sadis-bootstrap-html-laravel-admin-template-free.svg" alt="GitHub release">
-  </a>
-  <a href="https://github.com/themeselection/sadis-bootstrap-html-laravel-admin-template-free/issues">
-    <img src="https://img.shields.io/github/issues/themeselection/sadis-bootstrap-html-laravel-admin-template-free.svg" alt="GitHub issues">
-  </a>
-  <a href="https://github.com/themeselection/sadis-bootstrap-html-laravel-admin-template-free/issues">
-    <img src="https://img.shields.io/github/issues-closed/themeselection/sadis-bootstrap-html-laravel-admin-template-free.svg" alt="GitHub closed issues">
-  </a>
-</p>
-
 ## Introduction 🚀
 
 The Sentralisasi Arsip Digital System is a centralized digital archive platform designed to manage, organize, and monitor all file uploads across multiple divisions within an organization. The system provides different access levels for Super Admin, Admin, and User (per Division) — ensuring secure data management and role-based control.
