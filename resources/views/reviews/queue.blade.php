@@ -131,16 +131,11 @@
                         <i class="bx bx-check"></i> Approve
                       </button>
                     </form>
-                    {{-- Reject (modal alasan) --}}
-                    <button
-                      type="button"
-                      class="btn btn-danger btn-sm"
-                      data-bs-toggle="modal"
-                      data-bs-target="#rejectModal"
-                      data-file-id="{{ $f->id }}"
-                      data-file-title="{{ $f->title }}"
-                    >
-                      <i class="bx bx-x"></i> Reject
+                    {{-- REJECT (pakai modal notes) --}}
+                    <button type="button" class="btn btn-danger btn-sm"
+                            data-bs-toggle="modal"
+                            data-bs-target="#rejectModal">
+                      Reject
                     </button>
                   </div>
                 @else
@@ -148,7 +143,32 @@
                 @endif
               </td>
             </tr>
-          @empty
+          
+          {{-- Modal Reject --}}
+<div class="modal fade" id="rejectModal-{{ $f->id }}" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <form action="{{ route('reviews.reject', $f->id) }}" method="POST" class="modal-content">
+      @csrf
+      <div class="modal-header">
+        <h5 class="modal-title">Tolak File</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2 small text-muted">{{ $f->title }}</div>
+        <div class="mb-3">
+          <label class="form-label">Alasan penolakan</label>
+          <textarea class="form-control" name="notes" rows="3" maxlength="1000" required
+                    placeholder="Tuliskan alasan penolakan..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Batal</button>
+        <button class="btn btn-danger" type="submit">Kirim</button>
+      </div>
+    </form>
+  </div>
+</div>
+            @empty
             <tr>
               <td colspan="7" class="text-center py-5">
                 <i class="bx bx-folder-open bx-sm"></i>
@@ -179,29 +199,40 @@
   </div>
 </div>
 
-{{-- Modal Reject --}}
-<div class="modal fade" id="rejectModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog">
-    <form id="rejectForm" method="POST" class="modal-content">
-      @csrf
-      <div class="modal-header">
-        <h5 class="modal-title">Tolak File</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body">
-        <div class="mb-2 small text-muted" id="rejectFileTitle"></div>
-        <div class="mb-3">
-          <label class="form-label">Alasan penolakan</label>
-          {{-- Controller expects "notes" field --}}
-          <textarea class="form-control" name="notes" rows="3" required maxlength="1000" placeholder="Tuliskan alasan penolakan..."></textarea>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Batal</button>
-        <button class="btn btn-danger" type="submit">Kirim</button>
-      </div>
-    </form>
-  </div>
-</div>
+
+
+@push('scripts')
+<script>
+
+document.addEventListener('click', function(e){
+  const btn = e.target.closest('.btn-reject');
+  if (!btn) return;
+  const form = document.getElementById('rejectForm');
+  const title = document.getElementById('rejectFileTitle');
+  form.action = btn.dataset.action;  // <-- kunci: arahkan ke reviews.reject
+  if (title) title.textContent = btn.dataset.title || '';
+  if (window.bootstrap) bootstrap.Modal.getOrCreateInstance('#rejectModal').show();
+});
+
+document.addEventListener('DOMContentLoaded', function () {
+  const modalEl = document.getElementById('rejectModal');
+  if (!modalEl) return;
+
+  modalEl.addEventListener('show.bs.modal', function (e) {
+    const btn   = e.relatedTarget;
+    const action= btn?.getAttribute('data-action') || '';
+    const title = btn?.getAttribute('data-title')  || '';
+
+    const form  = document.getElementById('rejectForm');
+    const titleEl = document.getElementById('rejectFileTitle');
+
+    if (form && action) form.setAttribute('action', action);
+    if (titleEl) titleEl.textContent = title;
+  });
+});
+
+</script>
+@endpush
+
 
 @endsection

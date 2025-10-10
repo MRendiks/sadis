@@ -15,17 +15,61 @@ class FilesController extends Controller
 {
     public function index(Request $request)
     {
-        $u   = $request->user();
-        $q   = trim((string)$request->input('q',''));
-        $div = $request->input('division_id');
-        $folder = $request->input('folder_id');
-        $status = $request->input('status');
-        $size   = (int)$request->input('size', 10);
+        $u     = $request->user();
+        $q     = trim((string)$request->input('q',''));
+        $div   = $request->input('division_id');
+        $folder= $request->input('folder_id');
+        $status= $request->input('status');
+        $size  = (int)$request->input('size', 10);
 
-        $divisions = DB::table('divisions')->orderBy('name')->get();
-        $folders   = DB::table('folders')->orderBy('name')->get();
+        // Tentukan apakah user punya akses penuh
+        $hasFullAccess = method_exists($u, 'hasAnyRole')
+            ? $u->hasAnyRole(['super_admin','admin_arsip'])
+            : ($u->hasRole('super_admin') || $u->hasRole('admin_arsip'));
 
-        $files = DB::table('files')
+        // Kumpulan division_id yang boleh dilihat user biasa
+        $allowedDivisionIds = [];
+        if (!$hasFullAccess) {
+            $allowedDivisionIds = DB::table('user_divisions')
+                ->where('user_id', $u->id)
+                ->pluck('division_id')
+                ->all();
+
+            // fallback: kalau mapping kosong, pakai primary_division_id (jika ada)
+            if (empty($allowedDivisionIds) && !empty($u->primary_division_id)) {
+                $allowedDivisionIds = [$u->primary_division_id];
+            }
+            // Kalau tetap kosong, paksa ke array kosong agar tidak menampilkan apa pun
+            if (empty($allowedDivisionIds)) {
+                $allowedDivisionIds = [-1]; // id tidak mungkin
+            }
+        }
+
+        // === DROPDOWN DIVISIONS (hanya yang diizinkan user) ===
+        $divisions = DB::table('divisions')
+            ->when(!$hasFullAccess, fn($q) =>
+                $q->join('user_divisions','divisions.id','=','user_divisions.division_id')
+                ->where('user_divisions.user_id', $u->id)
+                ->select('divisions.*')
+                ->distinct()
+            )
+            ->orderBy('name')
+            ->get();
+
+        // === DROPDOWN FOLDERS (hanya folder dari divisions yang boleh dilihat) ===
+        $folders = DB::table('folders')
+            ->when(!$hasFullAccess, fn($q) =>
+                $q->whereIn('division_id', $allowedDivisionIds)
+            )
+            ->orderBy('name')
+            ->get();
+
+        // Jika user memilih division di luar allowed, kita abaikan/filter ulang
+        if (!$hasFullAccess && $div && !in_array((int)$div, $allowedDivisionIds, true)) {
+            $div = null; // atau bisa return 403 kalau mau strict
+        }
+
+        $filesQ = DB::table('files')
             ->join('divisions','files.division_id','=','divisions.id')
             ->leftJoin('folders','files.folder_id','=','folders.id')
             ->leftJoin('users as uploader','files.uploader_id','=','uploader.id')
@@ -43,18 +87,24 @@ class FilesController extends Controller
             ->when($div, fn($qq)=>$qq->where('files.division_id',$div))
             ->when($folder, fn($qq)=>$qq->where('files.folder_id',$folder))
             ->when($status, fn($qq)=>$qq->where('files.status',$status))
-            // user biasa hanya melihat divisinya
-            ->when($u->hasRole('user'), fn($qq)=>$qq->where('files.division_id',$u->primary_division_id))
-            ->whereNull('files.deleted_at')
+            ->whereNull('files.deleted_at');
+
+        // Batasi files ke allowedDivisionIds untuk user biasa
+        if (!$hasFullAccess) {
+            $filesQ->whereIn('files.division_id', $allowedDivisionIds);
+        }
+
+        $files = $filesQ
             ->orderByDesc('files.created_at')
             ->paginate($size)
             ->withQueryString();
 
-        // $statuses = ['draft','submitted','under_review','approved','rejected','archived'];
+        // Opsi status (sesuaikan kebijakanmu)
         $statuses = ['submitted'];
-        
 
-        return view('files.index', compact('files','divisions','folders','statuses','q','div','folder','status','size'));
+        return view('files.index', compact(
+            'files','divisions','folders','statuses','q','div','folder','status','size'
+        ));
     }
 
     public function create()
@@ -71,57 +121,55 @@ class FilesController extends Controller
             'folder_id'   => ['nullable','exists:folders,id'],
             'title'       => ['required','string','max:200'],
             'description' => ['nullable','string'],
-            'file'        => ['required','file','max:51200'], // 50MB (sesuaikan)
+            'file'        => ['required','file','max:51200'],
             'status'      => ['required', Rule::in(['draft','submitted','under_review','approved','rejected','archived'])],
         ]);
 
         $u = $request->user();
         $uploaded = $request->file('file');
 
-        // Simpan ke storage
-        $disk = config('filesystems.default', 'local'); // bisa 'local' dulu
-        $dir  = 'uploads/'.date('Y/m/d');
+        // Tentukan disk (local_files / synology)
+        $disk = env('FILES_DEFAULT_DISK', 'local_files');
+
+        // Tentukan direktori tujuan
+        if (!empty($data['folder_id'])) {
+            $folder = \App\Models\Folder::with(['division','parent'])->findOrFail($data['folder_id']);
+            $dir = FolderPathResolver::buildPath($folder);
+        } else {
+            $division = \App\Models\Division::find($data['division_id']);
+            $dir = $division ? ($division->code ?? $division->name ?? 'unknown_division') : 'unknown_division';
+        }
+
+        // --- gunakan nama asli file ---
+        $originalName = $uploaded->getClientOriginalName();
+        [$safeName, $finalName] = $this->prepareSafeFilename($disk, $dir, $originalName);
+
+        // simpan file dengan nama asli (atau versi bertambah jika bentrok)
+        $path = Storage::disk($disk)->putFileAs($dir, $uploaded, $finalName);
 
         $mime = $uploaded->getClientMimeType();
         $size = $uploaded->getSize();
         $hash = hash_file('sha256', $uploaded->getRealPath());
 
-        // Tentukan disk yang dipakai (local_files atau synology)
-        $disk = env('FILES_DEFAULT_DISK', 'local_files');
-
-        // Dapatkan folder tujuan (kalau tidak pilih folder_id, default ke division root)
-        if (!empty($data['folder_id'])) {
-            $folder = \App\Models\Folder::with(['division','parent'])->find($data['folder_id']);
-            $dir = FolderPathResolver::buildPath($folder); 
-        } else {
-            // kalau user langsung upload tanpa folder, pakai nama divisi
-            $division = \App\Models\Division::find($data['division_id']);
-            $dir = $division ? ($division->code ?? $division->name ?? 'unknown_division') : 'unknown_division';
-        }
-
-        // Upload file ke storage target
-        $path = Storage::disk($disk)->putFile($dir, $uploaded);
-
-        DB::transaction(function () use ($data, $u, $disk, $path, $mime, $size, $hash, $uploaded, $request) {
+        DB::transaction(function () use ($data, $u, $disk, $path, $mime, $size, $hash, $uploaded, $request, $finalName) {
             $fileId = DB::table('files')->insertGetId([
-                'division_id'   => $data['division_id'],
-                'folder_id'     => $data['folder_id'] ?? null,
-                'uploader_id'   => $u->id,
-                'title'         => $data['title'],
-                'description'   => $data['description'] ?? null,
-                'original_name' => $uploaded->getClientOriginalName(),
-                'storage_disk'  => $disk,
-                'storage_path'  => $path,
-                'mime_type'     => $mime,
-                'size_bytes'    => $size,
-                'hash_sha256'   => $hash,
-                'status'        => $data['status'],
+                'division_id'     => $data['division_id'],
+                'folder_id'       => $data['folder_id'] ?? null,
+                'uploader_id'     => $u->id,
+                'title'           => $data['title'],
+                'description'     => $data['description'] ?? null,
+                'original_name'   => $uploaded->getClientOriginalName(), // nama dari client
+                'storage_disk'    => $disk,
+                'storage_path'    => $path,       // contoh: APD/2025/10/10/laporan.pdf
+                'mime_type'       => $mime,
+                'size_bytes'      => $size,
+                'hash_sha256'     => $hash,
+                'status'          => $data['status'],
                 'current_version' => 1,
-                'created_at'    => now(),
-                'updated_at'    => now(),
+                'created_at'      => now(),
+                'updated_at'      => now(),
             ]);
 
-            // Simpan versi pertama
             DB::table('file_versions')->insert([
                 'file_id'      => $fileId,
                 'version'      => 1,
@@ -135,13 +183,16 @@ class FilesController extends Controller
                 'notes'        => 'Initial upload',
             ]);
 
-            // Log aktivitas
             DB::table('activity_logs')->insert([
                 'subject_type' => 'files',
                 'subject_id'   => $fileId,
                 'action'       => 'upload_file',
                 'causer_id'    => $u->id,
-                'properties'   => json_encode(['title'=>$data['title'],'original'=>$uploaded->getClientOriginalName()]),
+                'properties'   => json_encode([
+                    'title'    => $data['title'],
+                    'original' => $uploaded->getClientOriginalName(),
+                    'saved_as' => $finalName,
+                ]),
                 'ip_address'   => $request->ip(),
                 'user_agent'   => substr((string)$request->userAgent(),0,255),
                 'created_at'   => now(),
@@ -149,6 +200,35 @@ class FilesController extends Controller
         });
 
         return redirect()->route('files.index')->with('success','File uploaded successfully.');
+    }
+
+    /**
+     * Bersihkan nama file dari karakter berisiko & hindari bentrok nama.
+     * Return: [safeBaseName, finalName]
+     */
+    private function prepareSafeFilename(string $disk, string $dir, string $originalName): array
+    {
+        // cegah path traversal dan control chars
+        $originalName = str_replace(['\\', '/', "\0"], '-', $originalName);
+
+        $ext   = pathinfo($originalName, PATHINFO_EXTENSION);
+        $base  = pathinfo($originalName, PATHINFO_FILENAME);
+
+        // normalisasi (tetap mirip aslinya, tapi aman untuk filesystem)
+        $safeBase = trim(preg_replace('/[^A-Za-z0-9 _.-]+/u', '', $base)); // huruf/angka/spasi/_ . -
+        $safeBase = $safeBase === '' ? 'file' : $safeBase;
+
+        $candidate = $ext ? "{$safeBase}.{$ext}" : $safeBase;
+
+        // jika sudah ada file dengan nama sama, tambahkan (1), (2), ...
+        $i = 1;
+        while (Storage::disk($disk)->exists($dir.'/'.$candidate)) {
+            $suffix   = " ({$i})";
+            $candidate = $ext ? "{$safeBase}{$suffix}.{$ext}" : "{$safeBase}{$suffix}";
+            $i++;
+        }
+
+        return [$safeBase, $candidate];
     }
 
     public function edit($id)

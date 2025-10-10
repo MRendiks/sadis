@@ -56,7 +56,7 @@
           "slug": "reviews-queue"
         }
       ],
-      "role": ["admin_arsip", "super_admin"]
+      "role": ["admin_arsip", "super_admin", "user_bidang"]
     },
     {
       "name": "Files",

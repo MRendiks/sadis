@@ -33,6 +33,12 @@ composer install
 php artisan key:generate
 ```
 
+4. download this
+
+```bash
+composer require league/flysystem-sftp-v3
+```
+
 4. By running the following command, you will be able to get all the dependencies in your **node_modules** folder:
 
 ```bash

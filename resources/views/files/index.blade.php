@@ -3,6 +3,8 @@
 @section('title', 'Files - Index')
 
 @section('content')
+
+
 <div class="container-xxl container-p-y">
 
   @if(session('success'))
@@ -77,7 +79,20 @@
               <td>{{ $f->division_name }}</td>
               <td>{{ $f->folder_name ?? '-' }}</td>
               <td>{{ $f->uploader_name ?? '-' }}</td>
-              <td><span class="badge bg-label-info">{{ $f->status }}</span></td>
+              <td>
+              @php
+                  $statusColors = [
+                      'submitted'     => 'bg-label-info',       // biru muda
+                      'under_review'  => 'bg-label-warning',    // kuning
+                      'approved'      => 'bg-label-success',    // hijau
+                      'rejected'      => 'bg-label-danger',     // merah
+                      'archived'      => 'bg-label-secondary',  // abu-abu
+                  ];
+
+                  $badgeClass = $statusColors[$f->status] ?? 'bg-label-dark';
+              @endphp
+              <span class="badge {{ $badgeClass }}">{{ ucfirst(str_replace('_',' ', $f->status)) }}</span>
+            </td>
               <td>{{ number_format($f->size_bytes/1024,1) }} KB</td>
               <td>{{ $f->created_at }}</td>
               <td>

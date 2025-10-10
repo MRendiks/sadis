@@ -53,6 +53,19 @@ return [
       'visibility' => 'public',
       'throw' => false,
     ],
+    'synology_sftp' => [
+        'driver'   => 'sftp',
+        'host'     => env('SFTP_HOST', '192.168.1.100'),
+        'username' => env('SFTP_USERNAME', 'laravel-uploader'),
+        'password' => env('SFTP_PASSWORD', ''),   // pakai password
+        'port'     => env('SFTP_PORT', 22),
+        // Root path di NAS (path SFTP biasanya pakai /volume1/<share>)
+        'root'     => env('SFTP_ROOT', '/'),
+        'timeout'  => env('SFTP_TIMEOUT', 10),
+        // Opsional
+        'directoryPerm' => 0775,
+        'visibility'    => 'private',
+    ],
 
     's3' => [
       'driver' => 's3',
@@ -60,8 +73,8 @@ return [
       'secret' => env('AWS_SECRET_ACCESS_KEY'),
       'region' => env('AWS_DEFAULT_REGION'),
       'bucket' => env('AWS_BUCKET'),
-      'url' => env('AWS_URL'),
-      'endpoint' => env('AWS_ENDPOINT'),
+      // 'url' => env('AWS_URL'),
+      // 'endpoint' => env('AWS_ENDPOINT'),
       'use_path_style_endpoint' => env('AWS_USE_PATH_STYLE_ENDPOINT', false),
       'throw' => false,
     ],

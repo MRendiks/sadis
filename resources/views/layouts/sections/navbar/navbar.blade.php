@@ -51,7 +51,7 @@ $user = Auth::user();
         <li class="nav-item navbar-dropdown dropdown-user dropdown">
           <a class="nav-link dropdown-toggle hide-arrow d-flex align-items-center" href="#" data-bs-toggle="dropdown">
             <div class="avatar avatar-online me-2">
-              <img src="{{ $user->profile_photo_url ?? asset('assets/img/avatars/1.png') }}" alt class="w-px-40 h-auto rounded-circle" />
+              <img src="{{ $user->profile_photo_url ?? asset('assets/img/avatars/6.png') }}" alt class="w-px-40 h-auto rounded-circle" />
             </div>
             <div class="d-none d-lg-block text-start">
               <div class="fw-semibold">{{ $user->name }}</div>
@@ -68,7 +68,7 @@ $user = Auth::user();
             <li class="px-3 py-2">
               <div class="d-flex align-items-center">
                 <div class="avatar me-2">
-                  <img src="{{ $user->profile_photo_url ?? asset('assets/img/avatars/1.png') }}" class="w-px-40 h-auto rounded-circle" />
+                  <img src="{{ $user->profile_photo_url ?? asset('assets/img/avatars/6.png') }}" class="w-px-40 h-auto rounded-circle" />
                 </div>
                 <div>
                   <div class="fw-semibold">{{ $user->name }}</div>
