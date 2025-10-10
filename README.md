@@ -1,13 +1,13 @@
 <p align="center"></p>
 
 <p align="center">
-   <a href="https://themeselection.com/item/sadis-free-bootstrap-html-laravel-admin-template/" target="_blank">
+   <a href="public/assets/img/logo.jpg" target="_blank">
       <img src="https://cdn.themeselection.com/ts-assets/sadis/logo/logo.png" alt="sadis-logo" width="60px" height="auto">
    </a>
 </p>
 
 <h1 align="center">
-   <a href="https://themeselection.com/item/sadis-free-bootstrap-html-laravel-admin-template/" target="_blank" align="center">
+   <a href="public/assets/img/logo.jpg" target="_blank" align="center">
       Sadis - Sentralisasi Arsip Digital System
    </a>
 </h1>
