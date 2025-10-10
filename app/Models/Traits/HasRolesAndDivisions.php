@@ -17,19 +17,25 @@ trait HasRolesAndDivisions
         return $this->belongsToMany(Division::class, 'user_divisions');
     }
 
-    public function hasRole(string $name): bool
+    public function primaryDivision()
     {
-        return $this->roles()->where('name', $name)->exists();
+        return $this->belongsTo(Division::class, 'primary_division_id');
     }
 
-    public function hasAnyRole(array $names): bool
+    public function hasRole(string $role): bool
     {
-        return $this->roles()->whereIn('name', $names)->exists();
+        return $this->roles->contains(fn ($r) => $r->name === $role);
     }
 
-    /** Cepat buat ambil daftar ID divisi user */
-    public function divisionIds()
+    public function hasAnyRole(array $roles): bool
     {
-        return $this->divisions()->pluck('divisions.id');
+        return $this->roles->pluck('name')->intersect($roles)->isNotEmpty();
+    }
+
+    // 🔹 Tambahan biar kompatibel sama Blade lama (Spatie-like)
+    public function getRoleNames(): \Illuminate\Support\Collection
+    {
+        return $this->roles->pluck('name');
     }
 }
+

@@ -14,7 +14,7 @@ class DatabaseSeeder extends Seeder
                 RolesTableSeeder::class,
                 DivisionsTableSeeder::class,
                 UsersTableSeeder::class,
-                FoldersTableSeeder::class,
+                // FoldersTableSeeder::class,
                 ActivityLogsTableSeeder::class,
             ]);
         });

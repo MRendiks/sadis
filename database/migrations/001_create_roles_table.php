@@ -12,6 +12,7 @@ return new class extends Migration
             $table->bigIncrements('id');
             $table->string('name', 50)->unique();
             $table->string('description', 255)->nullable();
+            $table->string('guard_name', 255)->nullable();
         });
     }
 

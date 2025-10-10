@@ -9,105 +9,10 @@ use App\Http\Requests\Admin\StoreFileRequest;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Illuminate\Validation\Rule;
+use App\Support\FolderPathResolver;
 
 class FilesController extends Controller
 {
-    // public function index(Request $request)
-    // {
-    //     $u = Auth::user();
-    //     $q = $request->query('q');
-
-    //     // Pastikan User model punya hasAnyRole() & divisionIds() (dari trait kita)
-    //     $isPrivileged = $u->hasAnyRole(['super_admin','admin_arsip']);
-
-    //     $files = DB::table('files as f')
-    //         ->leftJoin('divisions as d','d.id','=','f.division_id')
-    //         ->leftJoin('folders as fo','fo.id','=','f.folder_id')
-    //         ->when(!$isPrivileged, function($qq) use ($u) {
-    //             // jika belum bikin trait, ganti $u->divisionIds() dengan subquery user_divisions (lihat catatan di bawah)
-    //             $qq->whereIn('f.division_id', $u->divisionIds());
-    //         })
-    //         ->when($q, fn($qq)=>$qq->where(function($w) use ($q){
-    //             $w->where('f.title','like',"%$q%")
-    //               ->orWhere('f.original_name','like',"%$q%");
-    //         }))
-    //         ->select('f.*','d.code as division_code','fo.name as folder_name')
-    //         ->orderByDesc('f.created_at')
-    //         ->paginate(20)
-    //         ->withQueryString();
-
-    //     $canUpload = $isPrivileged;
-
-    //     return view('files.index', compact('files','canUpload'));
-    // }
-
-    // // route ini sudah dibatasi middleware role:super_admin,admin_arsip di routes/web.php
-    // public function create()
-    // {
-    //     $divisions = DB::table('divisions')->where('is_active',1)->get();
-    //     $folders   = DB::table('folders')->get();
-    //     return view('files.create', compact('divisions','folders'));
-    // }
-
-    // public function store(StoreFileRequest $request)
-    // {
-    //     // Hanya super_admin/admin_arsip yang lolos ke sini (authorize di FormRequest)
-    //     $data = $request->validated();
-    //     $uploaded = $request->file('file');
-
-    //     $disk = config('filesystems.default', 'local');
-    //     $subdir = 'uploads/'.($data['division_id']).'/'.date('Y/m');
-    //     $storedPath = $uploaded->store($subdir, $disk);
-
-    //     $mime = $uploaded->getClientMimeType();
-    //     $size = $uploaded->getSize();
-    //     $hash = hash_file('sha256', $uploaded->getRealPath());
-
-    //     $fileId = DB::table('files')->insertGetId([
-    //         'division_id'     => $data['division_id'],
-    //         'folder_id'       => $data['folder_id'] ?? null,
-    //         'uploader_id'     => Auth::id(),                       // ✅
-    //         'title'           => $data['title'],
-    //         'description'     => $data['description'] ?? null,
-    //         'original_name'   => $uploaded->getClientOriginalName(),
-    //         'storage_disk'    => $disk,
-    //         'storage_path'    => $storedPath,
-    //         'mime_type'       => $mime,
-    //         'size_bytes'      => $size,
-    //         'hash_sha256'     => $hash,
-    //         'status'          => 'draft',
-    //         'current_version' => 1,
-    //         'created_at'      => now(),
-    //         'updated_at'      => now(),
-    //     ]);
-
-    //     DB::table('file_versions')->insert([
-    //         'file_id'      => $fileId,
-    //         'version'      => 1,
-    //         'storage_path' => $storedPath,
-    //         'storage_disk' => $disk,
-    //         'size_bytes'   => $size,
-    //         'mime_type'    => $mime,
-    //         'hash_sha256'  => $hash,
-    //         'uploaded_by'  => Auth::id(),                         // ✅
-    //         'uploaded_at'  => now(),
-    //         'notes'        => 'Initial upload',
-    //     ]);
-
-    //     DB::table('activity_logs')->insert([
-    //         'subject_type' => 'File',
-    //         'subject_id'   => $fileId,
-    //         'action'       => 'file.uploaded',
-    //         'properties'   => json_encode(['disk'=>$disk,'path'=>$storedPath]),
-    //         'causer_id'    => Auth::id(),                         // ✅
-    //         'ip_address'   => request()->ip(),
-    //         'user_agent'   => substr((string)request()->userAgent(),0,255),
-    //         'created_at'   => now(),
-    //     ]);
-
-    //     return redirect()->route('files.index')->with('success','File berhasil diupload');
-    // }
-
     public function index(Request $request)
     {
         $u   = $request->user();
@@ -145,7 +50,9 @@ class FilesController extends Controller
             ->paginate($size)
             ->withQueryString();
 
-        $statuses = ['draft','submitted','under_review','approved','rejected','archived'];
+        // $statuses = ['draft','submitted','under_review','approved','rejected','archived'];
+        $statuses = ['submitted'];
+        
 
         return view('files.index', compact('files','divisions','folders','statuses','q','div','folder','status','size'));
     }
@@ -174,11 +81,26 @@ class FilesController extends Controller
         // Simpan ke storage
         $disk = config('filesystems.default', 'local'); // bisa 'local' dulu
         $dir  = 'uploads/'.date('Y/m/d');
-        $path = $uploaded->store($dir, $disk);
 
         $mime = $uploaded->getClientMimeType();
         $size = $uploaded->getSize();
         $hash = hash_file('sha256', $uploaded->getRealPath());
+
+        // Tentukan disk yang dipakai (local_files atau synology)
+        $disk = env('FILES_DEFAULT_DISK', 'local_files');
+
+        // Dapatkan folder tujuan (kalau tidak pilih folder_id, default ke division root)
+        if (!empty($data['folder_id'])) {
+            $folder = \App\Models\Folder::with(['division','parent'])->find($data['folder_id']);
+            $dir = FolderPathResolver::buildPath($folder); 
+        } else {
+            // kalau user langsung upload tanpa folder, pakai nama divisi
+            $division = \App\Models\Division::find($data['division_id']);
+            $dir = $division ? ($division->code ?? $division->name ?? 'unknown_division') : 'unknown_division';
+        }
+
+        // Upload file ke storage target
+        $path = Storage::disk($disk)->putFile($dir, $uploaded);
 
         DB::transaction(function () use ($data, $u, $disk, $path, $mime, $size, $hash, $uploaded, $request) {
             $fileId = DB::table('files')->insertGetId([
@@ -352,14 +274,16 @@ class FilesController extends Controller
 
     private function authorizeFileAccess(object $file, \App\Models\User $user): void
     {
-        // super_admin boleh semua
-        if ($user->hasRole('super_admin')) return;
+        // super_admin, admin_arsip boleh semua
+        if ($user->hasRole('super_admin') || $user->hasRole('admin_arsip')) {
+            return;
+        }
 
         // admin: batasan opsional -> hanya divisi sendiri (aktifkan jika mau strict)
-        if ($user->hasRole('admin')) {
-            if ((int)$file->division_id === (int)$user->primary_division_id) return;
-            abort(403);
-        }
+        // if ($user->hasRole('admin')) {
+        //     if ((int)$file->division_id === (int)$user->primary_division_id) return;
+        //     abort(403);
+        // }
 
         // user: hanya file di divisinya
         if ($user->hasRole('user')) {

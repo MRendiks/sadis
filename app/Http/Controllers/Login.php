@@ -47,6 +47,6 @@ class Login extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->route('content.authentications.auth-login-basic');
+        return view('content.authentications.auth-login-basic');
     }
 }

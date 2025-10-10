@@ -1,6 +1,6 @@
 @extends('layouts/contentNavbarLayout')
 
-@section('title', 'Tables - Basic Tables')
+@section('title', 'Files - Crete')
 
 
 @section('content')
@@ -50,7 +50,7 @@
         <div class="col-md-6">
           <label class="form-label">Status</label>
           <select name="status" class="form-select">
-            @foreach (['draft','submitted','under_review','approved','rejected','archived'] as $s)
+            @foreach (['submitted'] as $s)
               <option value="{{ $s }}">{{ $s }}</option>
             @endforeach
           </select>

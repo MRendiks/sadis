@@ -5,10 +5,7 @@
       "name": "Dashboards",
       "icon": "menu-icon tf-icons bx bx-home-smile",
       "slug": "dashboard",
-      "badge": [
-        "danger",
-        "5"
-      ],
+      "badge": ["danger", "5"],
       "submenu": [
         {
           "url": "/",
@@ -27,7 +24,39 @@
           "name": "List",
           "slug": "users-list"
         }
-      ]
+      ],
+      "role": ["super_admin"]
+    },
+    {
+      "name": "Folder Management",
+      "icon": "menu-icon tf-icons bx bx-folder",
+      "slug": "folder-management",
+      "submenu": [
+        {
+          "url": "/folders",
+          "name": "List",
+          "slug": "folders-list"
+        },
+        {
+          "url": "/folders/create",
+          "name": "Create",
+          "slug": "folders-create"
+        }
+      ],
+      "role": ["super_admin"]
+    },
+    {
+      "name": "File Review",
+      "icon": "menu-icon tf-icons bx bx-check-shield",
+      "slug": "file-review",
+      "submenu": [
+        {
+          "url": "/reviews/queue",
+          "name": "Review Queue",
+          "slug": "reviews-queue"
+        }
+      ],
+      "role": ["admin_arsip", "super_admin"]
     },
     {
       "name": "Files",

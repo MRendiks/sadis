@@ -30,6 +30,16 @@ return [
 
   'disks' => [
 
+    'local_files' => [
+        'driver' => 'local',
+        'root'   => storage_path('app/sadis'),
+        'throw'  => false,
+    ],
+    'synology' => [
+        'driver' => 'local',
+        'root'   => '/mnt/nas/sadis',
+        'throw'  => false,
+    ],
     'local' => [
       'driver' => 'local',
       'root' => storage_path('app'),

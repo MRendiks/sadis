@@ -13,6 +13,7 @@ return new class extends Migration {
             $table->enum('decision', ['approve', 'reject', 'request_changes']);
             $table->text('notes')->nullable();
             $table->dateTime('created_at');
+            $table->dateTime('updated_at');
 
             $table->index('file_id', 'idx_reviews_file');
             $table->index('reviewer_id', 'idx_reviews_reviewer');

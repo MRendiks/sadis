@@ -1,52 +1,51 @@
 @php
-use Illuminate\Support\Facades\Route;
+  // Jika helper $canSee tidak dikirim dari parent, define ulang biar aman
+  if (!isset($canSee) || !is_callable($canSee)) {
+      $user = auth()->user();
+
+      // Ambil nama role user (pakai Spatie atau kolom role biasa)
+      $roleNames = collect(method_exists($user, 'getRoleNames') ? $user->getRoleNames() : [optional($user)->role])
+          ->filter()
+          ->values()
+          ->all();
+
+      // Helper cek apakah item boleh terlihat
+      $canSee = function ($item) use ($roleNames) {
+          if (!isset($item->role)) return true;
+          $required = is_array($item->role) ? $item->role : [$item->role];
+          return count(array_intersect($roleNames, $required)) > 0;
+      };
+  }
 @endphp
 
 <ul class="menu-sub">
-  @if (isset($menu))
-    @foreach ($menu as $submenu)
-
-    {{-- active menu method --}}
-    @php
-      $activeClass = null;
-      $active = 'active open';
-      $currentRouteName = Route::currentRouteName();
-
-      if ($currentRouteName === $submenu->slug) {
-          $activeClass = 'active';
-      }
-      elseif (isset($submenu->submenu)) {
-        if (gettype($submenu->slug) === 'array') {
-          foreach($submenu->slug as $slug){
-            if (str_contains($currentRouteName,$slug) and strpos($currentRouteName,$slug) === 0) {
-                $activeClass = $active;
-            }
-          }
-        }
-        else{
-          if (str_contains($currentRouteName,$submenu->slug) and strpos($currentRouteName,$submenu->slug) === 0) {
-            $activeClass = $active;
-          }
-        }
-      }
-    @endphp
-
-      <li class="menu-item {{$activeClass}}">
-        <a href="{{ isset($submenu->url) ? url($submenu->url) : 'javascript:void(0)' }}" class="{{ isset($submenu->submenu) ? 'menu-link menu-toggle' : 'menu-link' }}" @if (isset($submenu->target) and !empty($submenu->target)) target="_blank" @endif>
-          @if (isset($submenu->icon))
-          <i class="{{ $submenu->icon }}"></i>
-          @endif
-          <div>{{ isset($submenu->name) ? __($submenu->name) : '' }}</div>
-          @isset($submenu->badge)
-            <div class="badge rounded-pill bg-{{ $submenu->badge[0] }} text-uppercase ms-auto">{{ $submenu->badge[1] }}</div>
+  @foreach ($menu as $child)
+    @if ($canSee($child))
+      <li class="menu-item {{ (isset($child->active) && $child->active) ? 'active' : '' }}">
+        <a href="{{ $child->url ?? 'javascript:void(0);' }}" class="menu-link">
+          @isset($child->icon)
+            <i class="{{ $child->icon }}"></i>
+          @endisset
+          <div>{{ $child->name ?? '' }}</div>
+          @isset($child->badge)
+            <div class="badge rounded-pill bg-{{ $child->badge[0] }} text-uppercase ms-auto">{{ $child->badge[1] }}</div>
           @endisset
         </a>
 
-        {{-- submenu --}}
-        @if (isset($submenu->submenu))
-          @include('layouts.sections.menu.submenu',['menu' => $submenu->submenu])
-        @endif
+        {{-- Jika masih punya submenu di dalamnya, render recursive --}}
+        @isset($child->submenu)
+          @php
+            $filtered = collect($child->submenu)
+                ->filter(fn($sub) => $canSee($sub))
+                ->values()
+                ->all();
+          @endphp
+
+          @if (count($filtered))
+            @include('layouts.sections.menu.submenu', ['menu' => $filtered, 'canSee' => $canSee])
+          @endif
+        @endisset
       </li>
-    @endforeach
-  @endif
+    @endif
+  @endforeach
 </ul>

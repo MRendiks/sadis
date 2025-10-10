@@ -32,8 +32,11 @@
         <div class="card-body">
           <div class="app-brand justify-content-center">
             <a href="{{url('/')}}" class="app-brand-link gap-2">
-              <span class="app-brand-logo demo">@include('_partials.macros',["width"=>25,"withbg"=>'var(--bs-primary)'])</span>
-              <span class="app-brand-text demo text-heading fw-bold">{{config('variables.templateName')}}</span>
+              {{-- <span class="app-brand-logo demo">@include('_partials.macros',["width"=>25,"withbg"=>'var(--bs-primary)'])</span>
+              <span class="app-brand-text demo text-heading fw-bold">{{config('variables.templateName')}}</span> --}}
+              <span class="app-brand-logo">
+        <img src="{{ asset('assets/img/logo.jpg') }}" alt="Logo" width="200">
+      </span>
             </a>
           </div>
           <h4 class="mb-1">Welcome to {{config('variables.templateName')}}! 👋</h4>

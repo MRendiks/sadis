@@ -1,6 +1,6 @@
 @extends('layouts/contentNavbarLayout')
 
-@section('title', 'Tables - Basic Tables')
+@section('title', 'Files - Edit')
 
 @section('content')
 <div class="container-xxl container-p-y">

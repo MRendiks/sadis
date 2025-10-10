@@ -1,6 +1,6 @@
 @extends('layouts/contentNavbarLayout')
 
-@section('title', 'Tables - Basic Tables')
+@section('title', 'Files - Index')
 
 @section('content')
 <div class="container-xxl container-p-y">
@@ -11,7 +11,7 @@
 
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="mb-0">File Management</h4>
-    @if (auth()->user()->hasAnyRole(['super_admin','admin']))
+    @if (auth()->user()->hasAnyRole(['super_admin','admin_arsip', 'user_bidang']))
       <a href="{{ route('files.create') }}" class="btn btn-primary">
         <i class="bx bx-upload"></i> Upload File
       </a>

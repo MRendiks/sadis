@@ -1,6 +1,6 @@
 @extends('layouts/contentNavbarLayout')
 
-@section('title', 'Tables - Basic Tables')
+@section('title', 'List Users')
 
 @section('content')
 <div class="container-xxl flex-grow-1 container-p-y">
