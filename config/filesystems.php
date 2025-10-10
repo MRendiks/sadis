@@ -57,14 +57,11 @@ return [
         'driver'   => 'sftp',
         'host'     => env('SFTP_HOST', '192.168.1.100'),
         'username' => env('SFTP_USERNAME', 'laravel-uploader'),
-        'password' => env('SFTP_PASSWORD', ''),   // pakai password
-        'port'     => env('SFTP_PORT', 22),
-        // Root path di NAS (path SFTP biasanya pakai /volume1/<share>)
+        'password' => env('SFTP_PASSWORD', ''),   // atau null jika pakai key
+        'port'     => (int) env('SFTP_PORT', 22), // <— cast ke int
         'root'     => env('SFTP_ROOT', '/'),
-        'timeout'  => env('SFTP_TIMEOUT', 10),
-        // Opsional
-        'directoryPerm' => 0775,
-        'visibility'    => 'private',
+        'timeout'  => (int) env('SFTP_TIMEOUT', 10), // <— cast ke int
+        'visibility'      => 'private',
     ],
 
     's3' => [
