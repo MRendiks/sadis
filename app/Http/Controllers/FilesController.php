@@ -3,11 +3,12 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use App\Http\Requests\Admin\StoreFileRequest;
 use Illuminate\Support\Facades\Storage;
-use Symfony\Component\HttpFoundation\ResponseHeaderBag;
+use App\Models\Folder;
+use App\Models\Division;
+use Illuminate\Support\Str;
+use App\Support\StorageResolver;
 use Illuminate\Validation\Rule;
 use App\Support\FolderPathResolver;
 
@@ -117,40 +118,65 @@ class FilesController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'division_id' => ['required','exists:divisions,id'],
-            'folder_id'   => ['nullable','exists:folders,id'],
-            'title'       => ['required','string','max:200'],
-            'description' => ['nullable','string'],
-            'file'        => ['required','file','max:51200'],
-            'status'      => ['required', Rule::in(['draft','submitted','under_review','approved','rejected','archived'])],
+            'division_id' => ['required', 'exists:divisions,id'],
+            'folder_id'   => ['nullable', 'exists:folders,id'],
+            'title'       => ['required', 'string', 'max:200'],
+            'description' => ['nullable', 'string'],
+            'file'        => ['required', 'file', 'max:51200'], // 50MB
+            'status'      => ['required', Rule::in(['draft', 'submitted', 'under_review', 'approved', 'rejected', 'archived'])],
         ]);
 
         $u = $request->user();
         $uploaded = $request->file('file');
 
-        // Tentukan disk (local_files / synology)
-        $disk = env('FILES_DEFAULT_DISK', 'local_files');
+        // Tentukan disk aktif (synology_sftp atau local_files)
+        $disk = StorageResolver::disk(); // otomatis baca dari .env (FILESYSTEM_DISK_FINAL)
 
         // Tentukan direktori tujuan
         if (!empty($data['folder_id'])) {
-            $folder = \App\Models\Folder::with(['division','parent'])->findOrFail($data['folder_id']);
-            $dir = FolderPathResolver::buildPath($folder);
+            $folder = Folder::with(['division', 'parent'])->findOrFail($data['folder_id']);
+            $dir = ltrim(FolderPathResolver::buildPath($folder), '/');
         } else {
-            $division = \App\Models\Division::find($data['division_id']);
-            $dir = $division ? ($division->code ?? $division->name ?? 'unknown_division') : 'unknown_division';
+            $division = Division::find($data['division_id']);
+            $dir = ltrim($division ? ($division->code ?? $division->name ?? 'unknown_division') : 'unknown_division', '/');
         }
 
-        // --- gunakan nama asli file ---
+        // Pastikan direktori ada
+        if (!Storage::disk($disk)->directoryExists($dir)) {
+            Storage::disk($disk)->makeDirectory($dir);
+        }
+
+        // Nama file asli dan aman
         $originalName = $uploaded->getClientOriginalName();
-        [$safeName, $finalName] = $this->prepareSafeFilename($disk, $dir, $originalName);
+        [$safeBase, $finalName] = $this->prepareSafeFilename($disk, $dir, $originalName);
 
-        // simpan file dengan nama asli (atau versi bertambah jika bentrok)
-        $path = Storage::disk($disk)->putFileAs($dir, $uploaded, $finalName);
+        // Upload file
+        try {
+            $path = Storage::disk($disk)->putFileAs($dir, $uploaded, $finalName);
+            if ($path === false) {
+                throw new \RuntimeException('Failed to store file.');
+            }
+        } catch (\Throwable $e) {
+            // Fallback ke local_files kalau NAS gagal
+            \Log::warning('Upload to NAS failed, fallback to local_files', [
+                'error' => $e->getMessage(),
+                'dir'   => $dir,
+                'name'  => $finalName,
+            ]);
 
+            $disk = 'local_files';
+            if (!Storage::disk($disk)->directoryExists($dir)) {
+                Storage::disk($disk)->makeDirectory($dir);
+            }
+            $path = Storage::disk($disk)->putFileAs($dir, $uploaded, $finalName);
+        }
+
+        // Metadata file
         $mime = $uploaded->getClientMimeType();
         $size = $uploaded->getSize();
         $hash = hash_file('sha256', $uploaded->getRealPath());
 
+        // Simpan ke DB dalam satu transaksi
         DB::transaction(function () use ($data, $u, $disk, $path, $mime, $size, $hash, $uploaded, $request, $finalName) {
             $fileId = DB::table('files')->insertGetId([
                 'division_id'     => $data['division_id'],
@@ -158,9 +184,9 @@ class FilesController extends Controller
                 'uploader_id'     => $u->id,
                 'title'           => $data['title'],
                 'description'     => $data['description'] ?? null,
-                'original_name'   => $uploaded->getClientOriginalName(), // nama dari client
+                'original_name'   => $uploaded->getClientOriginalName(),
                 'storage_disk'    => $disk,
-                'storage_path'    => $path,       // contoh: APD/2025/10/10/laporan.pdf
+                'storage_path'    => $path,
                 'mime_type'       => $mime,
                 'size_bytes'      => $size,
                 'hash_sha256'     => $hash,
@@ -194,41 +220,31 @@ class FilesController extends Controller
                     'saved_as' => $finalName,
                 ]),
                 'ip_address'   => $request->ip(),
-                'user_agent'   => substr((string)$request->userAgent(),0,255),
+                'user_agent'   => substr((string)$request->userAgent(), 0, 255),
                 'created_at'   => now(),
             ]);
         });
 
-        return redirect()->route('files.index')->with('success','File uploaded successfully.');
+        return redirect()->route('files.index')->with('success', 'File uploaded successfully.');
     }
 
     /**
-     * Bersihkan nama file dari karakter berisiko & hindari bentrok nama.
-     * Return: [safeBaseName, finalName]
+     * Generate safe filename (avoid overwrite)
      */
-    private function prepareSafeFilename(string $disk, string $dir, string $originalName): array
+    private function prepareSafeFilename(string $disk, string $dir, string $original): array
     {
-        // cegah path traversal dan control chars
-        $originalName = str_replace(['\\', '/', "\0"], '-', $originalName);
+        $name = pathinfo($original, PATHINFO_FILENAME);
+        $ext  = pathinfo($original, PATHINFO_EXTENSION);
+        $safe = Str::slug($name, '-');
+        $candidate = $ext ? "{$safe}.{$ext}" : $safe;
 
-        $ext   = pathinfo($originalName, PATHINFO_EXTENSION);
-        $base  = pathinfo($originalName, PATHINFO_FILENAME);
-
-        // normalisasi (tetap mirip aslinya, tapi aman untuk filesystem)
-        $safeBase = trim(preg_replace('/[^A-Za-z0-9 _.-]+/u', '', $base)); // huruf/angka/spasi/_ . -
-        $safeBase = $safeBase === '' ? 'file' : $safeBase;
-
-        $candidate = $ext ? "{$safeBase}.{$ext}" : $safeBase;
-
-        // jika sudah ada file dengan nama sama, tambahkan (1), (2), ...
         $i = 1;
-        while (Storage::disk($disk)->exists($dir.'/'.$candidate)) {
-            $suffix   = " ({$i})";
-            $candidate = $ext ? "{$safeBase}{$suffix}.{$ext}" : "{$safeBase}{$suffix}";
-            $i++;
+        while (Storage::disk($disk)->exists(trim($dir, '/') . '/' . $candidate)) {
+            $suffix = '-' . $i++;
+            $candidate = $ext ? "{$safe}{$suffix}.{$ext}" : "{$safe}{$suffix}";
         }
 
-        return [$safeBase, $candidate];
+        return [$safe, $candidate];
     }
 
     public function edit($id)

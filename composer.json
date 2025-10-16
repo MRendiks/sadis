@@ -11,6 +11,7 @@
     "php": "^8.2",
     "laravel/framework": "^11.0",
     "laravel/tinker": "^2.9",
+    "league/flysystem-sftp-v3": "^3.30",
     "spatie/laravel-permission": "^6.21"
   },
   "require-dev": {

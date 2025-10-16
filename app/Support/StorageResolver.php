@@ -5,6 +5,6 @@ class StorageResolver
 {
     public static function disk(): string
     {
-        return config('files.default_disk', env('FILES_DEFAULT_DISK','local_files'));
+       return env('FILESYSTEM_DISK_FINAL', env('FILES_DEFAULT_DISK', 'synology_sftp'));
     }
 }
