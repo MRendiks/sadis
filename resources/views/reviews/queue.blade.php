@@ -134,7 +134,7 @@
                     {{-- REJECT (pakai modal notes) --}}
                         <button class="btn btn-sm btn-danger"
                             data-bs-toggle="modal"
-                            data-bs-target="#rejectModal-{{ $file->id }}">
+                            data-bs-target="#rejectModal-{{ $f->id }}">
                       Tolak
                     </button>
                   </div>
@@ -145,13 +145,13 @@
             </tr>
 
           <!-- Modal Reject (ID harus unik) -->
-            <div class="modal fade" id="rejectModal-{{ $file->id }}" tabindex="-1" aria-hidden="true">
+            <div class="modal fade" id="rejectModal-{{ $f->id }}" tabindex="-1" aria-hidden="true">
               <div class="modal-dialog">
-                <form method="POST" action="{{ route('reviews.reject', $file->id) }}">
+                <form method="POST" action="{{ route('reviews.reject', $f->id) }}">
                   @csrf
                   <div class="modal-content">
                     <div class="modal-header">
-                      <h5 class="modal-title">Tolak: {{ $file->title }}</h5>
+                      <h5 class="modal-title">Tolak: {{ $f->title }}</h5>
                       <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
 
