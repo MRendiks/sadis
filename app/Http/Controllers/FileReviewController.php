@@ -74,25 +74,34 @@ class FileReviewController extends Controller
     }
 
     public function reject(Request $request, FileEntry $file)
-    {
-        abort_unless($request->user()->hasAnyRole(['admin_arsip','super_admin']), 403);
-        $data = $request->validate(['notes'=>['required','string','max:1000']]);
-        DB::transaction(function() use ($request,$file,$data){
-            $file->update([
-                'status'=>'rejected',
-                'reviewed_by'=>$request->user()->id,
-                'reviewed_at'=>now(),
-                'review_notes'=>$data['notes'],
-            ]);
-            Review::create([
-                'file_id'=>$file->id,'reviewer_id'=>$request->user()->id,'decision'=>'reject','notes'=>$data['notes'],
-            ]);
-            ActivityLog::create([
-                'subject_type'=>'files','subject_id'=>$file->id,'action'=>'reject',
-                'causer_id'=>$request->user()->id,'properties'=>['title'=>$file->title,'notes'=>$data['notes']],
-                'ip_address'=>$request->ip(),'user_agent'=>substr((string)$request->userAgent(),0,255),'created_at'=>now(),
-            ]);
-        });
-        return back()->with('success','Rejected with notes.');
-    }
+      {
+      $request->validate(['notes' => ['required','string','max:1000']]);
+
+      DB::transaction(function () use ($request, $file) {
+          $file->update([
+              'status'       => 'rejected',
+              'reviewed_by'  => $request->user()->id,
+              'reviewed_at'  => now(),
+              'review_notes' => $request->notes,
+          ]);
+
+          Review::create([
+              'file_id'     => $file->id,
+              'reviewer_id' => $request->user()->id,
+              'decision'    => 'reject',
+              'notes'       => $request->notes,
+          ]);
+
+          ActivityLog::create([
+              'subject_type'=>'files','subject_id'=>$file->id,'action'=>'reject',
+              'causer_id'=>$request->user()->id,
+              'properties'=>['title'=>$file->title,'notes'=>$request->notes],
+              'ip_address'=>$request->ip(),
+              'user_agent'=>substr((string)$request->userAgent(),0,255),
+              'created_at'=>now(),
+          ]);
+      });
+
+      return back()->with('success', 'Rejected with notes.');
+  }
 }

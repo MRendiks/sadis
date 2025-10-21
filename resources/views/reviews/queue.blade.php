@@ -132,10 +132,10 @@
                       </button>
                     </form>
                     {{-- REJECT (pakai modal notes) --}}
-                    <button type="button" class="btn btn-danger btn-sm"
+                        <button class="btn btn-sm btn-danger"
                             data-bs-toggle="modal"
-                            data-bs-target="#rejectModal">
-                      Reject
+                            data-bs-target="#rejectModal-{{ $file->id }}">
+                      Tolak
                     </button>
                   </div>
                 @else
@@ -143,31 +143,39 @@
                 @endif
               </td>
             </tr>
-          
-          {{-- Modal Reject --}}
-<div class="modal fade" id="rejectModal-{{ $f->id }}" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog">
-    <form action="{{ route('reviews.reject', $f->id) }}" method="POST" class="modal-content">
-      @csrf
-      <div class="modal-header">
-        <h5 class="modal-title">Tolak File</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <div class="mb-2 small text-muted">{{ $f->title }}</div>
-        <div class="mb-3">
-          <label class="form-label">Alasan penolakan</label>
-          <textarea class="form-control" name="notes" rows="3" maxlength="1000" required
-                    placeholder="Tuliskan alasan penolakan..."></textarea>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-outline-secondary" type="button" data-bs-dismiss="modal">Batal</button>
-        <button class="btn btn-danger" type="submit">Kirim</button>
-      </div>
-    </form>
-  </div>
-</div>
+
+          <!-- Modal Reject (ID harus unik) -->
+            <div class="modal fade" id="rejectModal-{{ $file->id }}" tabindex="-1" aria-hidden="true">
+              <div class="modal-dialog">
+                <form method="POST" action="{{ route('reviews.reject', $file->id) }}">
+                  @csrf
+                  <div class="modal-content">
+                    <div class="modal-header">
+                      <h5 class="modal-title">Tolak: {{ $file->title }}</h5>
+                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+
+                    <div class="modal-body">
+                      <label class="form-label">Alasan penolakan <span class="text-danger">*</span></label>
+                      <textarea name="notes"
+                                class="form-control @error('notes') is-invalid @enderror"
+                                rows="4"
+                                maxlength="1000"
+                                required>{{ old('notes') }}</textarea>
+                      @error('notes')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                      @enderror
+                    </div>
+
+                    <div class="modal-footer">
+                      <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                      <button type="submit" class="btn btn-danger">Tolak</button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+
             @empty
             <tr>
               <td colspan="7" class="text-center py-5">
