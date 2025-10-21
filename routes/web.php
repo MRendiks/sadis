@@ -37,7 +37,7 @@ Route::middleware(['auth'])->group(function () {
     // FILES (umum)
     // =======================
     Route::get('/files', [FilesController::class,'index'])->name('files.index');
-    Route::get('/files/{id}/preview', [FilesController::class,'preview'])->name('files.preview');
+    Route::get('/files/{id}/preview', [FilesController::class,'preview'])->name('files.preview')->middleware(['auth']);
     Route::get('/files/{id}/download', [FilesController::class,'download'])->name('files.download');
 
     // Create/Store dibatasi Policy: submit (user_bidang, admin_arsip, super_admin)

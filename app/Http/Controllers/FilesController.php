@@ -391,49 +391,50 @@ class FilesController extends Controller
         abort(403);
     }
 
-    public function preview(Request $request, $id)
+    public function preview(Request $request, int $id)
     {
-        $file = DB::table('files')->where('id',$id)->whereNull('deleted_at')->first();
-        abort_if(!$file, 404);
-        $this->authorizeFileAccess($file, $request->user());
+        $file = DB::table('files')->where('id', $id)->first();
+        abort_if(!$file, 404, 'File not found');
 
-        $disk = $file->storage_disk ?? config('filesystems.default', 'local');
+        // (opsional) cek izin user
+        // $this->authorize('view', $file);
+
+        $disk = $file->storage_disk ?? 'synology_sftp';
         $path = $file->storage_path;
 
-        // Jika S3/remote: gunakan temporary URL, set Content-Disposition inline
-        if (in_array($disk, ['s3','minio','spaces'])) {
-            // 5 menit url sementara
-            $url = Storage::disk($disk)->temporaryUrl($path, now()->addMinutes(5), [
-                'Response-Content-Type'        => $file->mime_type ?: 'application/octet-stream',
-                'Response-Content-Disposition' => 'inline; filename="'.($file->original_name ?? 'file').'"',
-            ]);
-            return redirect()->away($url);
-        }
+        abort_if(!Storage::disk($disk)->exists($path), 404, 'File not found');
 
-        // Local: kirim sebagai inline (PDF/images tampil di browser)
-        $absolute = Storage::disk($disk)->path($path);
-        abort_if(!is_file($absolute), 404, 'File not found');
+        // Baca stream dari storage (NAS via SFTP)
+        $stream = Storage::disk($disk)->readStream($path);
+        abort_if(!$stream, 404, 'Cannot read stream');
 
-        // Hanya inline-kan untuk tipe tampilan umum (pdf & images). Lainnya force download lebih baik.
-        $inlineTypes = ['application/pdf','image/jpeg','image/png','image/gif','image/webp','image/svg+xml'];
-        $disposition = in_array($file->mime_type, $inlineTypes) ? 'inline' : 'attachment';
+        $mime = $file->mime_type ?: (Storage::disk($disk)->mimeType($path) ?: 'application/octet-stream');
+        $filename = $file->original_name ?? basename($path);
+        $disposition = 'inline'; // ubah ke 'attachment' kalau mau paksa download
 
-        DB::table('activity_logs')->insert([
-          'subject_type' => 'files',
-          'subject_id'   => $file->id,
-          'action'       => 'preview_file', // atau 'download_file'
-          'causer_id'    => $request->user()->id ?? null,
-          'properties'   => json_encode(['title'=>$file->title]),
-          'ip_address'   => $request->ip(),
-          'user_agent'   => substr((string)$request->userAgent(),0,255),
-          'created_at'   => now(),
+        // Catat log activity
+          DB::table('activity_logs')->insert([
+              'subject_type' => 'files',
+              'subject_id'   => $file->id,
+              'action'       => 'preview_file', // atau 'download_file'
+              'causer_id'    => $request->user()->id ?? null,
+              'properties'   => json_encode(['title' => $file->title ?? $filename]),
+              'ip_address'   => $request->ip(),
+              'user_agent'   => substr((string)$request->userAgent(), 0, 255),
+              'created_at'   => now(),
+          ]);
+
+        // Kirim file ke browser
+        return response()->stream(function () use ($stream) {
+            fpassthru($stream);
+            if (is_resource($stream)) fclose($stream);
+        }, 200, [
+            'Content-Type'              => $mime,
+            'Content-Disposition'       => $disposition . '; filename="' . addcslashes($filename, '"\\') . '"',
+            'X-Content-Type-Options'    => 'nosniff',
+            'Cache-Control'             => 'private, max-age=0, no-cache',
+            'Pragma'                    => 'no-cache',
         ]);
-        return response()->file($absolute, [
-            'Content-Type' => $file->mime_type ?: 'application/octet-stream',
-            'Content-Disposition' => $disposition.'; filename="'.($file->original_name ?? basename($absolute)).'"',
-            'X-Content-Type-Options' => 'nosniff',
-        ]);
-
     }
 
     public function download(Request $request, $id)
